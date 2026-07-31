@@ -38,7 +38,7 @@ const send = (method: string, params: Record<string, unknown>): Promise<any> =>
     let buffer = "";
     let settled = false;
     const timer = setTimeout(
-      () => finish(new HerdrError("timeout", `herdr '${method}' timed out`)),
+      () => finish(() => reject(new HerdrError("timeout", `herdr '${method}' timed out`))),
       DEFAULT_TIMEOUT_MS,
     );
 
