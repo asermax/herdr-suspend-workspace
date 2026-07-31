@@ -14,8 +14,8 @@ rebuilt and agents resume their conversations.
   `HERDR_PLUGIN_STATE_DIR/suspended/`, then calls `workspace.close`.
 - **Restore** creates a fresh workspace and replays each tab with `layout.apply`.
   Agent panes are relaunched with their resume argv (e.g. `claude --resume <id>`,
-  `pi --session <id>`), so conversations resume. The original non-agent pane
-  commands are replayed too (e.g. a dev server restarts).
+  `pi --session <id>`), so conversations resume. Non-agent panes come back as
+  plain shells in their original cwd — see below for why.
 
 The resume-argv table mirrors herdr's own `src/agent_resume.rs`, so only
 official `herdr:<agent>` sessions are resumable.
@@ -89,9 +89,21 @@ description = "resume suspended workspace"
 
 - **Preserved:** workspace name & cwd, all tabs, pane layout/splits/ratios, pane
   cwds & labels, and agent conversations (via resume).
-- **Lost:** running non-agent processes are killed on close and replayed as fresh
-  commands; terminal scrollback is not restored; pane/tab/workspace ids change on
-  rebuild.
+- **Lost:** running non-agent processes are killed on close and, in the common
+  case, *not* restarted; terminal scrollback is not restored; pane/tab/workspace
+  ids change on rebuild.
 
 There is no native "hide" primitive in herdr, so suspending closes the
 workspace — background processes do not survive while hidden.
+
+### Why non-agent commands usually don't come back
+
+`layout.export` reports a pane's `command` only when herdr was handed one at spawn
+time — a pane built by `layout.apply` or by a config-driven layout. A pane you
+opened as a shell and then typed into exports with no `command` at all, so there is
+nothing for restore to replay. A dev server started by typing `npm run dev` into a
+pane therefore comes back as an idle shell, not a running server.
+
+herdr does surface the foreground command as `terminal_title` in `pane.list`, but a
+scraped title isn't a trustworthy argv, so the plugin deliberately ignores it rather
+than risk re-running the wrong thing.
