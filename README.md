@@ -51,22 +51,30 @@ The plugin exposes two actions and one popup pane:
 | --- | --- | --- |
 | `suspend` | action (workspace context) | Snapshot + close the current workspace |
 | `resume` | action (workspace context) | Opens the suspended-workspaces picker |
-| `picker` | popup pane | Interactive list with search; `enter` restores, `esc` cancels |
+| `picker` | popup pane | Interactive list with search; `enter` restores, `x` deletes, `esc` cancels |
 
 ### Picker keys
 
 | Key | Mode | Action |
 | --- | --- | --- |
-| `↑`/`↓`, `j`/`k`, `ctrl+p`/`ctrl+n` | both | move selection |
+| `↑`/`↓`, `j`/`k`, `ctrl+p`/`ctrl+n` | browse, search | move selection |
 | `enter` | browse | restore the selected workspace |
+| `x` | browse | delete the selected snapshot (asks to confirm) |
 | `/` | browse | start searching (matches label and cwd) |
 | `enter` | search | keep the filter and go back to browsing |
 | `esc` | search | discard the edit, back to the previous filter |
-| `ctrl+u` | both | clear the filter |
+| `ctrl+u` | browse, search | clear the filter |
 | `esc`, `ctrl+c` | browse | close the popup |
+| `y` | confirm | go ahead with the deletion |
+| any other key | confirm | cancel the deletion |
 
 The search is token-based: `lay adm` matches a workspace whose label or cwd
 contains both `lay` and `adm`.
+
+Deleting discards the snapshot file permanently — the workspace it described is
+already closed, so there is nothing left to restore it from. The confirmation
+swallows the keypress that answers it, so `enter` on a confirm prompt cancels
+rather than falling through to a restore.
 
 Invoke `suspend` / `resume` from the command palette, or bind keys in
 `~/.config/herdr/config.toml`:

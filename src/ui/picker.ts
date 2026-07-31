@@ -1,7 +1,7 @@
 import process from "node:process";
 
 import { restoreWorkspace } from "../restore";
-import { listSuspended } from "../state";
+import { listSuspended, removeSnapshot } from "../state";
 import type { SuspendedWorkspace } from "../types";
 
 const CLEAR = "\x1b[2J\x1b[H";
@@ -77,20 +77,28 @@ const searchLine = (query: string, searching: boolean): string => {
   return `${DIM}/ to search${RESET}`;
 };
 
-const hintLine = (searching: boolean): string =>
-  searching
-    ? `${DIM}type to filter · enter to keep it · esc to discard · ctrl+u to clear${RESET}`
-    : `${DIM}↑/↓ or j/k to move · enter to restore · / to search · esc to cancel${RESET}`;
+const hintLine = (searching: boolean, confirming: SuspendedWorkspace | null): string => {
+  if (confirming) {
+    return `${BOLD}Delete ${confirming.label}?${RESET} ${DIM}y to confirm · any other key to cancel${RESET}`;
+  }
+
+  if (searching) {
+    return `${DIM}type to filter · enter to keep it · esc to discard · ctrl+u to clear${RESET}`;
+  }
+
+  return `${DIM}↑/↓ or j/k to move · enter to restore · x to delete · / to search · esc to cancel${RESET}`;
+};
 
 const render = (
   snapshots: SuspendedWorkspace[],
   query: string,
   selected: number,
   searching: boolean,
+  confirming: SuspendedWorkspace | null,
 ): void => {
   const lines = [
     `${BOLD}Resume suspended workspace${RESET}`,
-    hintLine(searching),
+    hintLine(searching, confirming),
     searchLine(query, searching),
     "",
   ];
@@ -138,7 +146,7 @@ const readKey = (): Promise<string> =>
   });
 
 export const runPicker = async (): Promise<void> => {
-  const snapshots = await listSuspended();
+  let snapshots = await listSuspended();
 
   if (snapshots.length === 0) {
     await waitForAnyKey(`${DIM}No suspended workspaces.${RESET}`, 0);
@@ -153,11 +161,20 @@ export const runPicker = async (): Promise<void> => {
   let selected = 0;
   let searching = false;
   let committedQuery = "";
+  let confirming: SuspendedWorkspace | null = null;
 
   const applyQuery = (next: string): void => {
     query = next;
     filtered = filterSnapshots(snapshots, query);
     selected = 0;
+  };
+
+  const deleteSnapshot = async (target: SuspendedWorkspace): Promise<void> => {
+    await removeSnapshot(target.id);
+
+    snapshots = snapshots.filter((entry) => entry.id !== target.id);
+    filtered = filterSnapshots(snapshots, query);
+    selected = Math.min(selected, Math.max(0, filtered.length - 1));
   };
 
   const quit = (): never => {
@@ -166,7 +183,7 @@ export const runPicker = async (): Promise<void> => {
     process.exit(0);
   };
 
-  render(filtered, query, selected, searching);
+  render(filtered, query, selected, searching, confirming);
 
   let snapshot: SuspendedWorkspace | undefined;
 
@@ -174,6 +191,16 @@ export const runPicker = async (): Promise<void> => {
     const key = await readKey();
 
     if (key === KEY_CTRL_C) quit();
+
+    // Any key other than 'y' cancels, so the confirmation has to swallow the key
+    // before navigation or search can act on it.
+    if (confirming) {
+      if (key === "y" || key === "Y") await deleteSnapshot(confirming);
+
+      confirming = null;
+      render(filtered, query, selected, searching, confirming);
+      continue;
+    }
 
     if (key === KEY_CTRL_U) {
       applyQuery("");
@@ -210,10 +237,12 @@ export const runPicker = async (): Promise<void> => {
         selected = filtered.length === 0 ? 0 : (selected - 1 + filtered.length) % filtered.length;
       } else if (key === "j") {
         selected = filtered.length === 0 ? 0 : (selected + 1) % filtered.length;
+      } else if (key === "x" && filtered.length > 0) {
+        confirming = filtered[selected];
       }
     }
 
-    render(filtered, query, selected, searching);
+    render(filtered, query, selected, searching, confirming);
   }
 
   setRaw(false);
