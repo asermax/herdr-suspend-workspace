@@ -5,6 +5,8 @@ pane layout, and agent conversations, then closes it so it (and its agents)
 disappear from the sidebar. Restore it later from a popup picker — the layout is
 rebuilt and agents resume their conversations.
 
+<img width="1727" height="859" alt="Screenshot_20260731_004802" src="https://github.com/user-attachments/assets/38e01906-1c0d-498e-acfb-efbd3b2ee247" />
+
 ## How it works
 
 - **Suspend** captures the workspace via `layout.export` (per tab) and
