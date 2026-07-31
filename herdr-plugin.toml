@@ -1,0 +1,26 @@
+id = "asermax.workspace-suspend"
+name = "Suspend Workspace"
+version = "0.1.0"
+min_herdr_version = "0.7.5"
+description = "Suspend a workspace (snapshot layout + agents, close it, restore later from a popup picker)."
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "suspend"
+title = "Suspend workspace"
+contexts = ["workspace"]
+command = ["bun", "bin/suspend.ts"]
+
+[[actions]]
+id = "resume"
+title = "Resume suspended workspace"
+contexts = ["workspace"]
+command = ["bun", "bin/resume.ts"]
+
+[[panes]]
+id = "picker"
+title = "Suspended workspaces"
+placement = "popup"
+width = "70%"
+height = 16
+command = ["bun", "bin/picker.ts"]
