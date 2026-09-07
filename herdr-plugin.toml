@@ -1,6 +1,6 @@
 id = "asermax.workspace-suspend"
 name = "Suspend Workspace"
-version = "0.2.0"
+version = "0.2.1"
 min_herdr_version = "0.7.5"
 description = "Suspend a workspace (snapshot layout + agents, close it, restore later from a popup picker)."
 platforms = ["linux", "macos"]
