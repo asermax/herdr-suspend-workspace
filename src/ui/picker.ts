@@ -118,8 +118,10 @@ const render = (
       lines.push(`${marker} ${name}  ${meta}`);
     });
 
-    if (snapshots.length > capacity) {
-      lines.push(`${DIM}  …${snapshots.length - capacity - start} more${RESET}`);
+    const remaining = snapshots.length - capacity - start;
+
+    if (remaining > 0) {
+      lines.push(`${DIM}  …${remaining} more${RESET}`);
     }
   }
 
