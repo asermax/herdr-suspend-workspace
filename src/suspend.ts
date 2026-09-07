@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { resumeArgv } from "./agents";
-import { createHerdrClient, type HerdrClient } from "./herdr-client";
-import { saveSnapshot } from "./state";
+import { createHerdrClient, HerdrError, type HerdrClient } from "./herdr-client";
+import { removeSnapshot, saveSnapshot } from "./state";
 import type { AgentSession, LayoutNode, SuspendedTab, SuspendedWorkspace } from "./types";
 
 const resolveWorkspaceId = (): string => {
@@ -111,7 +111,24 @@ export const runSuspend = async (): Promise<void> => {
 
   // Closing the workspace removes it and its agents from the lists; the snapshot
   // already holds everything needed to rebuild it.
-  await client.workspaceClose(workspaceId);
+  try {
+    await client.workspaceClose(workspaceId);
+  } catch (err) {
+    // herdr 0.9 refuses to close a primary workspace with linked worktree workspaces
+    // unless the whole group goes. The snapshot only covers this workspace, so closing
+    // the group would lose the others; leave everything open instead.
+    await removeSnapshot(snapshot.id);
+
+    if (err instanceof HerdrError && err.code === "workspace_group_close_required") {
+      await client.notificationShow(
+        "Workspace not suspended",
+        "Close or suspend its worktree workspaces first.",
+      );
+    }
+
+    throw err;
+  }
+
   await client.notificationShow(
     "Workspace suspended",
     `${snapshot.label} · ${snapshot.tabs.length} tab${snapshot.tabs.length === 1 ? "" : "s"}`,
