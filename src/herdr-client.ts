@@ -90,6 +90,7 @@ export interface HerdrClient {
   layoutExport: (tabId: string) => Promise<any>;
   layoutApply: (params: Record<string, unknown>) => Promise<any>;
   paneZoom: (paneId: string, mode: "on" | "off" | "toggle") => Promise<void>;
+  paneSendInput: (paneId: string, text: string, keys: string[]) => Promise<void>;
   pluginPaneOpen: (params: Record<string, unknown>) => Promise<void>;
   notificationShow: (title: string, body?: string) => Promise<void>;
 }
@@ -120,6 +121,9 @@ export const createHerdrClient = (): HerdrClient => ({
 
   paneZoom: (paneId, mode) =>
     send("pane.zoom", { pane_id: paneId, mode }).then(() => undefined),
+
+  paneSendInput: (paneId, text, keys) =>
+    send("pane.send_input", { pane_id: paneId, text, keys }).then(() => undefined),
 
   pluginPaneOpen: (params) => send("plugin.pane.open", params).then(() => undefined),
 

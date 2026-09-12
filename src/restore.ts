@@ -1,4 +1,6 @@
 import { createHerdrClient, type HerdrClient } from "./herdr-client";
+import { pairPaneCommands, stripCommands } from "./layout";
+import { shellCommandFromArgv } from "./shell";
 import { readSnapshot, removeSnapshot } from "./state";
 import type { SuspendedWorkspace } from "./types";
 
@@ -17,10 +19,17 @@ const rebuildTabs = async (
       ...(index === 0 ? { tab_id: defaultTabId } : { workspace_id: workspaceId }),
       ...(tab.label ? { tab_label: tab.label } : {}),
       focus: false,
-      root: tab.root,
+      root: stripCommands(tab.root),
     });
 
     newTabIds.push(layout.tab_id);
+
+    // Commands are typed into each pane's shell rather than spawned as the pane
+    // process, mirroring herdr's own restart restore: when the agent exits the
+    // shell is still there, so the pane and its tab survive.
+    for (const { pane_id, argv } of pairPaneCommands(tab.root, layout.root)) {
+      await client.paneSendInput(pane_id, shellCommandFromArgv(argv), ["Enter"]);
+    }
 
     if (tab.zoomed && layout.focused_pane_id) {
       await client.paneZoom(layout.focused_pane_id, "on");

@@ -12,10 +12,13 @@ rebuilt and agents resume their conversations.
 - **Suspend** captures the workspace via `layout.export` (per tab) and
   `pane.list` (for each pane's agent session), stores a snapshot under
   `HERDR_PLUGIN_STATE_DIR/suspended/`, then calls `workspace.close`.
-- **Restore** creates a fresh workspace and replays each tab with `layout.apply`.
-  Agent panes are relaunched with their resume argv (e.g. `claude --resume <id>`,
-  `pi --session <id>`), so conversations resume. Non-agent panes come back as
-  plain shells in their original cwd — see below for why.
+- **Restore** creates a fresh workspace and replays each tab with `layout.apply`,
+  where every pane comes up as a plain shell in its original cwd. Agent panes then
+  get their resume argv (e.g. `claude --resume <id>`, `pi --session <id>`) typed
+  into that shell, so conversations resume. This is the same approach herdr uses
+  when it restores agents after a server restart: the shell stays underneath the
+  agent, so quitting the agent leaves the pane open instead of closing the tab.
+  Non-agent panes rarely carry a command to replay — see below for why.
 
 The resume-argv table mirrors herdr's own `src/agent_resume.rs`, so only
 official `herdr:<agent>` sessions are resumable.
