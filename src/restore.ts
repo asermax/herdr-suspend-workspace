@@ -17,7 +17,6 @@ const rebuildTabs = async (
     // tabs to the rebuilt workspace.
     const layout = await client.layoutApply({
       ...(index === 0 ? { tab_id: defaultTabId } : { workspace_id: workspaceId }),
-      ...(tab.label ? { tab_label: tab.label } : {}),
       focus: false,
       root: stripCommands(tab.root),
     });
@@ -29,6 +28,14 @@ const rebuildTabs = async (
     // shell is still there, so the pane and its tab survive.
     for (const { pane_id, argv } of pairPaneCommands(tab.root, layout.root)) {
       await client.paneSendInput(pane_id, shellCommandFromArgv(argv), ["Enter"]);
+    }
+
+    // The label is restored by rename, not layout.apply: a tab_created carrying
+    // an agent name (e.g. "pi") makes label-driven plugins such as
+    // asermax.tab-command start that agent themselves, racing the resume command
+    // just typed. Rename does not re-fire tab_created.
+    if (tab.label) {
+      await client.tabRename(layout.tab_id, tab.label);
     }
 
     if (tab.zoomed && layout.focused_pane_id) {

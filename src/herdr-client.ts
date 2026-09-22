@@ -86,6 +86,7 @@ export interface HerdrClient {
   workspaceFocus: (workspaceId: string) => Promise<void>;
   tabList: (workspaceId: string) => Promise<any[]>;
   tabFocus: (tabId: string) => Promise<void>;
+  tabRename: (tabId: string, label: string) => Promise<void>;
   paneList: (workspaceId: string) => Promise<any[]>;
   layoutExport: (tabId: string) => Promise<any>;
   layoutApply: (params: Record<string, unknown>) => Promise<any>;
@@ -111,6 +112,9 @@ export const createHerdrClient = (): HerdrClient => ({
     send("tab.list", { workspace_id: workspaceId }).then((r) => (r?.tabs ?? []) as any[]),
 
   tabFocus: (tabId) => send("tab.focus", { tab_id: tabId }).then(() => undefined),
+
+  tabRename: (tabId, label) =>
+    send("tab.rename", { tab_id: tabId, label }).then(() => undefined),
 
   paneList: (workspaceId) =>
     send("pane.list", { workspace_id: workspaceId }).then((r) => (r?.panes ?? []) as any[]),
