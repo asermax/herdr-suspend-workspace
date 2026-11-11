@@ -1,8 +1,9 @@
-import type { LayoutNode } from "./types";
+import type { LayoutNode, SavedAgent } from "./types";
 
 export interface PaneCommand {
   readonly pane_id: string;
   readonly argv: string[];
+  readonly agent?: SavedAgent;
 }
 
 export const stripCommands = (node: LayoutNode): LayoutNode => {
@@ -14,7 +15,7 @@ export const stripCommands = (node: LayoutNode): LayoutNode => {
     };
   }
 
-  const { command, ...pane } = node;
+  const { command, agent, ...pane } = node;
 
   return pane;
 };
@@ -36,7 +37,13 @@ export const pairPaneCommands = (snapshot: LayoutNode, applied: LayoutNode): Pan
     snapshot.command?.length &&
     applied.pane_id
   ) {
-    return [{ pane_id: applied.pane_id, argv: snapshot.command }];
+    return [
+      {
+        pane_id: applied.pane_id,
+        argv: snapshot.command,
+        ...(snapshot.agent ? { agent: snapshot.agent } : {}),
+      },
+    ];
   }
 
   return [];

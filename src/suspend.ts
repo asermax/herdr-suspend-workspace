@@ -2,8 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { resumeArgv } from "./agents";
 import { createHerdrClient, HerdrError, type HerdrClient } from "./herdr-client";
+import { isThrowawayName } from "./relaunch";
 import { removeSnapshot, saveSnapshot } from "./state";
 import type { AgentSession, LayoutNode, SuspendedTab, SuspendedWorkspace } from "./types";
+
+interface PaneAgent {
+  readonly session: AgentSession;
+  readonly name: string | null;
+}
 
 const resolveWorkspaceId = (): string => {
   const fromEnv = process.env.HERDR_WORKSPACE_ID;
@@ -30,7 +36,7 @@ const firstPaneCwd = (node: LayoutNode): string | null => {
 // dropped because layout.apply mints fresh ids.
 const buildRestoreNode = (
   node: LayoutNode,
-  agentByPane: Map<string, AgentSession>,
+  agentByPane: Map<string, PaneAgent>,
 ): LayoutNode => {
   if (node.type === "split") {
     return {
@@ -41,20 +47,37 @@ const buildRestoreNode = (
   }
 
   const { pane_id, ...pane } = node;
-  const session = pane_id ? agentByPane.get(pane_id) : undefined;
-  const resume = session ? resumeArgv(session) : null;
+  const agent = pane_id ? agentByPane.get(pane_id) : undefined;
+  const resume = agent ? resumeArgv(agent.session) : null;
+  if (!agent || !resume) return pane;
 
-  return { ...pane, ...(resume ? { command: resume } : {}) };
+  // `agent` lets restore relaunch through agent.start, so herdr records the
+  // conversation and the agent keeps its name. `command` alone still works for
+  // older readers, which type it into the shell.
+  return { ...pane, command: resume, agent: { kind: agent.session.agent, name: agent.name } };
 };
 
 const collectAgentSessions = async (
   client: HerdrClient,
   workspaceId: string,
-): Promise<Map<string, AgentSession>> => {
-  const panes = await client.paneList(workspaceId);
-  const byPane = new Map<string, AgentSession>();
+): Promise<Map<string, PaneAgent>> => {
+  // pane.list carries the conversation, agent.list the name the user gave it.
+  const [panes, agents] = await Promise.all([client.paneList(workspaceId), client.agentList()]);
+  const nameByPane = new Map<string, string>();
+  for (const agent of agents) {
+    if (agent.workspace_id === workspaceId && agent.name && !isThrowawayName(agent.name)) {
+      nameByPane.set(agent.pane_id, agent.name);
+    }
+  }
+
+  const byPane = new Map<string, PaneAgent>();
   for (const pane of panes) {
-    if (pane.agent_session) byPane.set(pane.pane_id, pane.agent_session);
+    if (pane.agent_session) {
+      byPane.set(pane.pane_id, {
+        session: pane.agent_session,
+        name: nameByPane.get(pane.pane_id) ?? null,
+      });
+    }
   }
 
   return byPane;

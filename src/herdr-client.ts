@@ -24,7 +24,11 @@ interface RpcEnvelope {
   readonly error?: { readonly code: string; readonly message: string };
 }
 
-const send = (method: string, params: Record<string, unknown>): Promise<any> =>
+const send = (
+  method: string,
+  params: Record<string, unknown>,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<any> =>
   new Promise((resolve, reject) => {
     const socketPath = resolveSocketPath();
     let socket: ReturnType<typeof createConnection>;
@@ -39,7 +43,7 @@ const send = (method: string, params: Record<string, unknown>): Promise<any> =>
     let settled = false;
     const timer = setTimeout(
       () => finish(() => reject(new HerdrError("timeout", `herdr '${method}' timed out`))),
-      DEFAULT_TIMEOUT_MS,
+      timeoutMs,
     );
 
     const finish = (action: () => void) => {
@@ -94,6 +98,17 @@ export interface HerdrClient {
   paneSendInput: (paneId: string, text: string, keys: string[]) => Promise<void>;
   pluginPaneOpen: (params: Record<string, unknown>) => Promise<void>;
   notificationShow: (title: string, body?: string) => Promise<void>;
+  agentList: () => Promise<any[]>;
+  agentStart: (params: AgentStartParams) => Promise<any>;
+  agentRename: (target: string, name: string | null) => Promise<void>;
+}
+
+export interface AgentStartParams {
+  readonly name: string;
+  readonly kind: string;
+  readonly pane_id: string;
+  readonly args: string[];
+  readonly timeout_ms: number;
 }
 
 export const createHerdrClient = (): HerdrClient => ({
@@ -133,4 +148,16 @@ export const createHerdrClient = (): HerdrClient => ({
 
   notificationShow: (title, body) =>
     send("notification.show", { title, ...(body ? { body } : {}) }).then(() => undefined),
+
+  agentList: () => send("agent.list", {}).then((r) => (r?.agents ?? []) as any[]),
+
+  // agent.start blocks until the agent is ready (or its own timeout_ms runs out),
+  // so the socket wait has to outlast it.
+  agentStart: (params) =>
+    send("agent.start", { ...params }, params.timeout_ms + DEFAULT_TIMEOUT_MS).then(
+      (r) => r.agent,
+    ),
+
+  agentRename: (target, name) =>
+    send("agent.rename", { target, name }).then(() => undefined),
 });
