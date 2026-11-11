@@ -14,10 +14,14 @@ rebuilt and agents resume their conversations.
   `HERDR_PLUGIN_STATE_DIR/suspended/`, then calls `workspace.close`.
 - **Restore** creates a fresh workspace and replays each tab with `layout.apply`,
   where every pane comes up as a plain shell in its original cwd. Agent panes then
-  get their resume argv (e.g. `claude --resume <id>`, `pi --session <id>`) typed
-  into that shell, so conversations resume. This is the same approach herdr uses
-  when it restores agents after a server restart: the shell stays underneath the
-  agent, so quitting the agent leaves the pane open instead of closing the tab.
+  resume their conversation (e.g. `claude --resume <id>`, `pi --session <id>`)
+  through `agent.start`, which runs the command in that shell and records the
+  conversation and agent name in herdr, so the workspace can be suspended again
+  later. This matters for agents whose hooks can't report their conversation to
+  herdr themselves (Codex runs its hooks in a shared app-server, outside the
+  pane). Snapshots from older versions fall back to typing the command. Either
+  way the shell stays underneath the agent, as with herdr's own restart restore,
+  so quitting the agent leaves the pane open instead of closing the tab.
   Non-agent panes rarely carry a command to replay — see below for why.
 
 The resume-argv table mirrors herdr's own `src/agent_resume.rs`, so only

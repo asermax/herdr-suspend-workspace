@@ -14,6 +14,13 @@ export interface LayoutPaneNode {
   readonly cwd?: string;
   readonly command?: string[];
   readonly env?: Record<string, string>;
+  // Snapshot-only: the agent that `command` resumes. Stripped before layout.apply.
+  readonly agent?: SavedAgent;
+}
+
+export interface SavedAgent {
+  readonly kind: string;
+  readonly name: string | null;
 }
 
 export interface LayoutSplitNode {
