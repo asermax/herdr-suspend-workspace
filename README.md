@@ -63,6 +63,7 @@ The plugin exposes two actions and one popup pane:
 | `↑`/`↓`, `j`/`k`, `ctrl+p`/`ctrl+n` | browse, search | move selection |
 | `enter` | browse | restore the selected workspace |
 | `x` | browse | delete the selected snapshot (asks to confirm) |
+| `t` | browse | reset the Claude Code cleanup clock of the selected workspace's conversations |
 | `/` | browse | start searching (matches label and cwd) |
 | `enter` | search | keep the filter and go back to browsing |
 | `esc` | search | discard the edit, back to the previous filter |
@@ -95,6 +96,30 @@ type = "plugin_action"
 command = "asermax.workspace-suspend.resume"
 description = "resume suspended workspace"
 ```
+
+## Claude Code transcript cleanup
+
+Claude Code deletes a conversation transcript once it hasn't been modified for
+`cleanupPeriodDays` days (30 by default). The sweep runs silently whenever any
+Claude Code session starts. A suspended workspace's Claude conversations aren't
+running, so their clock keeps ticking, and a conversation deleted while its
+workspace is suspended can't be resumed.
+
+- The picker shows when each workspace's first Claude conversation is due for
+  cleanup ("Claude cleanup in 12d"), in yellow within 7 days, and in red when a
+  conversation is already gone.
+- A herdr notification warns about workspaces within 7 days of cleanup, at most
+  once a day. The check runs at server startup, after a suspend, and when a
+  workspace is created.
+- `t` in the picker bumps the selected workspace's transcripts (plus their
+  spilled tool results and MCP task files, which are swept on their own age) to
+  now, restarting the clock. Content is not changed. One side effect: the
+  conversations move to the top of Claude Code's `/resume` list.
+
+The period is read from `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR`).
+Managed or project settings can set a shorter one, which isn't detected. To
+keep suspended conversations for months, set a large value, for example
+`"cleanupPeriodDays": 3650`.
 
 ## What is preserved vs. lost
 

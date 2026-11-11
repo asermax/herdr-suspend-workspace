@@ -1,5 +1,13 @@
 import process from "node:process";
 
+import {
+  describeCleanup,
+  needsWarning,
+  readCleanupPeriodDays,
+  resetCleanupClock,
+  workspaceCleanup,
+  type WorkspaceCleanup,
+} from "../cleanup";
 import { restoreWorkspace } from "../restore";
 import { listSuspended, removeSnapshot } from "../state";
 import type { SuspendedWorkspace } from "../types";
@@ -10,6 +18,8 @@ const SHOW_CURSOR = "\x1b[?25h";
 const DIM = "\x1b[2m";
 const CYAN = "\x1b[36m";
 const BOLD = "\x1b[1m";
+const YELLOW = "\x1b[33m";
+const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
 
 const KEY_ENTER = "\r";
@@ -42,6 +52,16 @@ const tabCount = (snapshot: SuspendedWorkspace): string => {
   const count = snapshot.tabs.length;
 
   return `${count} tab${count === 1 ? "" : "s"}`;
+};
+
+// "· Claude cleanup in 12d", highlighted once it's within the warning window.
+const cleanupMeta = (cleanup: WorkspaceCleanup | undefined): string => {
+  const text = cleanup ? describeCleanup(cleanup) : null;
+  if (!cleanup || !text) return "";
+  if (cleanup.deleted > 0) return ` · ${RED}${text}${RESET}`;
+  if (needsWarning(cleanup)) return ` · ${YELLOW}${text}${RESET}`;
+
+  return `${DIM} · ${text}${RESET}`;
 };
 
 const matches = (snapshot: SuspendedWorkspace, query: string): boolean => {
@@ -86,7 +106,7 @@ const hintLine = (searching: boolean, confirming: SuspendedWorkspace | null): st
     return `${DIM}type to filter · enter to keep it · esc to discard · ctrl+u to clear${RESET}`;
   }
 
-  return `${DIM}↑/↓ or j/k to move · enter to restore · x to delete · / to search · esc to cancel${RESET}`;
+  return `${DIM}↑/↓ or j/k to move · enter to restore · x to delete · t to reset Claude cleanup · / to search · esc to cancel${RESET}`;
 };
 
 const render = (
@@ -95,6 +115,7 @@ const render = (
   selected: number,
   searching: boolean,
   confirming: SuspendedWorkspace | null,
+  cleanups: Map<string, WorkspaceCleanup>,
 ): void => {
   const lines = [
     `${BOLD}Resume suspended workspace${RESET}`,
@@ -114,7 +135,7 @@ const render = (
       const isSelected = start + index === selected;
       const marker = isSelected ? `${CYAN}❯${RESET}` : " ";
       const name = isSelected ? `${BOLD}${snapshot.label}${RESET}` : snapshot.label;
-      const meta = `${DIM}${tabCount(snapshot)} · ${relativeTime(snapshot.suspended_at)}${RESET}`;
+      const meta = `${DIM}${tabCount(snapshot)} · ${relativeTime(snapshot.suspended_at)}${RESET}${cleanupMeta(cleanups.get(snapshot.id))}`;
       lines.push(`${marker} ${name}  ${meta}`);
     });
 
@@ -154,6 +175,12 @@ export const runPicker = async (): Promise<void> => {
     await waitForAnyKey(`${DIM}No suspended workspaces.${RESET}`, 0);
   }
 
+  const periodDays = await readCleanupPeriodDays();
+  const cleanups = new Map<string, WorkspaceCleanup>();
+  await Promise.all(
+    snapshots.map(async (entry) => cleanups.set(entry.id, await workspaceCleanup(entry, periodDays))),
+  );
+
   setRaw(true);
   process.stdin.resume();
   process.stdin.setEncoding("utf8");
@@ -185,7 +212,7 @@ export const runPicker = async (): Promise<void> => {
     process.exit(0);
   };
 
-  render(filtered, query, selected, searching, confirming);
+  render(filtered, query, selected, searching, confirming, cleanups);
 
   let snapshot: SuspendedWorkspace | undefined;
 
@@ -200,7 +227,7 @@ export const runPicker = async (): Promise<void> => {
       if (key === "y" || key === "Y") await deleteSnapshot(confirming);
 
       confirming = null;
-      render(filtered, query, selected, searching, confirming);
+      render(filtered, query, selected, searching, confirming, cleanups);
       continue;
     }
 
@@ -241,10 +268,17 @@ export const runPicker = async (): Promise<void> => {
         selected = filtered.length === 0 ? 0 : (selected + 1) % filtered.length;
       } else if (key === "x" && filtered.length > 0) {
         confirming = filtered[selected];
+      } else if (key === "t" && filtered.length > 0) {
+        const target = filtered[selected];
+        const cleanup = cleanups.get(target.id);
+        if (cleanup) {
+          await resetCleanupClock(cleanup);
+          cleanups.set(target.id, await workspaceCleanup(target, periodDays));
+        }
       }
     }
 
-    render(filtered, query, selected, searching, confirming);
+    render(filtered, query, selected, searching, confirming, cleanups);
   }
 
   setRaw(false);
