@@ -17,6 +17,15 @@ title = "Resume suspended workspace"
 contexts = ["workspace"]
 command = ["bun", "bin/resume.ts"]
 
+# Warn when a suspended workspace's Claude conversation is close to Claude Code's
+# transcript cleanup (at most once a day).
+[[startup]]
+command = ["bun", "bin/warn.ts"]
+
+[[events]]
+on = "workspace.created"
+command = ["bun", "bin/warn.ts"]
+
 [[panes]]
 id = "picker"
 title = "Suspended workspaces"
